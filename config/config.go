@@ -59,14 +59,16 @@ type LoggingConfig struct {
 }
 
 type InstanceConfig struct {
-	Name          string `yaml:"name"`
-	Host          string `yaml:"host"`
-	Port          int    `yaml:"port"`
-	User          string `yaml:"user"`
-	Password      string `yaml:"password"`
-	BackupDir     string `yaml:"backup_dir"`
-	RetentionDays int    `yaml:"retention_days"`
-	Schedule      string `yaml:"schedule"`
+	Name          string   `yaml:"name"`
+	Host          string   `yaml:"host"`
+	Port          int      `yaml:"port"`
+	User          string   `yaml:"user"`
+	Password      string   `yaml:"password"`
+	BackupDir     string   `yaml:"backup_dir"`
+	RetentionDays int      `yaml:"retention_days"`
+	Schedule      string   `yaml:"schedule"`
+	Include       []string `yaml:"include,omitempty"`
+	Exclude       []string `yaml:"exclude,omitempty"`
 }
 
 func LoadConfig(path string) (*Config, error) {

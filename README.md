@@ -90,6 +90,11 @@ instances:
     backup_dir: /backups/primary
     retention_days: 14
     schedule: "0 2 * * *"
+    # Optional: explicitly include or exclude specific databases
+    # include:
+    #   - my_app_db
+    # exclude:
+    #   - temp_db
 
   - name: secondary
     host: 192.168.1.20
@@ -109,6 +114,8 @@ instances:
   - `webhooks`: An array of webhook endpoints. Each can have its own `events` block to fire only on specific outcomes.
 - `logging.file`: The path where log files should be written. 
 - `instances`: An array of MariaDB instances. Each requires its own name, connection details, backup directory, retention configuration (in days), and cron `schedule`.
+  - `include`: (Optional) If specified, ONLY the listed databases will be backed up.
+  - `exclude`: (Optional) If specified, the listed databases will be ignored. System databases are ALWAYS excluded automatically.
 
 > **Note:** Make sure the user specified in the configuration has `SELECT`, `LOCK TABLES`, `SHOW VIEW`, and `TRIGGER` permissions to properly perform `mysqldump` operations across all databases.
 

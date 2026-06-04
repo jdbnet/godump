@@ -39,6 +39,33 @@ func discoverDatabases(cfg config.InstanceConfig) ([]string, error) {
 		if err := rows.Scan(&name); err != nil {
 			return nil, err
 		}
+
+		if len(cfg.Include) > 0 {
+			included := false
+			for _, inc := range cfg.Include {
+				if name == inc {
+					included = true
+					break
+				}
+			}
+			if !included {
+				continue
+			}
+		}
+
+		if len(cfg.Exclude) > 0 {
+			excluded := false
+			for _, exc := range cfg.Exclude {
+				if name == exc {
+					excluded = true
+					break
+				}
+			}
+			if excluded {
+				continue
+			}
+		}
+
 		databases = append(databases, name)
 	}
 
