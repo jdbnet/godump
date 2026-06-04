@@ -1,6 +1,11 @@
-# GoDump
+<div align="center">
+  <img src="web/templates/icon.png" alt="GoDump" width="128" />
+  
+  # GoDump
 
 GoDump is a lightweight, standalone MariaDB backup application written in Go. It manages multiple MariaDB instances concurrently, automatically discovers databases, runs scheduled backups, enforces retention policies, and presents a sleek, embedded web UI to manage operations.
+
+</div>
 
 ## Features
 
@@ -19,16 +24,14 @@ The machine running GoDump must have the following installed in its system PATH:
 - `mysqldump`
 - `gzip`
 
-## Building from Source
+## Installation
 
-Ensure you have Go 1.20+ installed.
-
-```bash
-git clone <repository_url>
-cd godump
-go mod tidy
-GOOS=linux GOARCH=amd64 go build -o godump
-```
+1. Download the pre-compiled binary:
+   ```bash
+   wget https://apps.jdbnet.co.uk/godump
+   chmod +x godump
+   sudo mv godump /usr/local/bin/
+   ```
 
 ## Configuration
 
@@ -111,12 +114,46 @@ instances:
 
 ## Usage
 
-1. Create a `config.yaml` using the template above.
+1. Create a `config.yaml` using the template above (or let GoDump generate a default one by running it without a config).
 2. Run the application:
    ```bash
-   ./godump --config /path/to/your/config.yaml
+   godump --config /etc/godump/config.yaml
    ```
 3. Open a web browser and navigate to `http://<your_server_ip>:<configured_port>`.
+
+## Running as a Service (Systemd)
+
+We highly recommend running GoDump via Systemd so that it starts automatically on boot and runs continuously in the background.
+
+1. Create a configuration directory and move your `config.yaml` there:
+   ```bash
+   sudo mkdir -p /etc/godump
+   sudo cp config.yaml /etc/godump/config.yaml
+   ```
+
+2. Create a systemd service file at `/etc/systemd/system/godump.service`:
+   ```ini
+   [Unit]
+   Description=GoDump MariaDB Backup Manager
+   After=network.target
+
+   [Service]
+   Type=simple
+   User=root
+   ExecStart=/usr/local/bin/godump --config /etc/godump/config.yaml
+   Restart=on-failure
+   RestartSec=5
+
+   [Install]
+   WantedBy=multi-user.target
+   ```
+
+3. Enable and start the service:
+   ```bash
+   sudo systemctl daemon-reload
+   sudo systemctl enable godump
+   sudo systemctl start godump
+   ```
 
 From the UI, you can:
 - See the overall status of all configured instances.
