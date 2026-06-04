@@ -8,6 +8,7 @@ import (
 
 	"godump/config"
 	"godump/logger"
+	"godump/notify"
 
 	"github.com/robfig/cron/v3"
 )
@@ -77,6 +78,7 @@ func (s *InstanceStatus) Snapshot() InstanceSnapshot {
 }
 
 type Manager struct {
+	cfg       *config.Config
 	instances map[string]*InstanceStatus
 	cron      *cron.Cron
 	mu        sync.RWMutex
@@ -87,6 +89,7 @@ func NewManager(cfg *config.Config) *Manager {
 	c.Start()
 
 	m := &Manager{
+		cfg:       cfg,
 		instances: make(map[string]*InstanceStatus),
 		cron:      c,
 	}
@@ -305,7 +308,22 @@ func (m *Manager) RunInstance(name string) {
 	} else {
 		inst.OverallResult = "partial"
 	}
+	
+	payload := notify.Payload{
+		InstanceName:  name,
+		OverallResult: inst.OverallResult,
+		Time:          time.Now(),
+	}
+	for _, db := range dbs {
+		dbStat := inst.Databases[db]
+		payload.Databases = append(payload.Databases, notify.DBResult{
+			Name:   dbStat.Name,
+			Size:   dbStat.LastBackupSize,
+			Result: dbStat.LastBackupResult,
+		})
+	}
 	inst.mu.Unlock()
 	
 	logger.Info(name, "Backup job completed. Result: %s", inst.OverallResult)
+	notify.Send(m.cfg.Notifications, payload)
 }

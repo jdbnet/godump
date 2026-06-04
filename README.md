@@ -9,6 +9,8 @@ GoDump is a lightweight, standalone MariaDB backup application written in Go. It
 - **Isolated Backups**: Each database is backed up via `mysqldump` in a dedicated subprocess, compressed instantly with `gzip`, and stored independently. Failure of one database does not disrupt others.
 - **Retention Policies**: Configurable retention period (in days) per instance. Old backups are automatically groomed after every run.
 - **Embedded Web UI**: Single-page modern interface served directly from the Go binary. No external CDN dependencies, fully functional offline. View statuses, trigger manual backups, browse backup files, and read real-time logs.
+- **Optional Authentication**: Secure your dashboard and API with a simple, cookie-based session login.
+- **Notifications**: Receive instant alerts when backup jobs complete via HTML Emails (SMTP) or JSON Webhooks (perfect for Ntfy, Gotify, Discord, Slack, Zapier, etc.).
 - **Cron Scheduling**: Uses standard cron expressions to schedule automated jobs.
 
 ## Requirements
@@ -38,6 +40,41 @@ GoDump uses a YAML configuration file. By default, it looks for `/etc/godump/con
 server:
   port: 8080
 
+auth:
+  enabled: true
+  username: admin
+  password: password
+
+notifications:
+  events:
+    on_success: false
+    on_failure: true
+  email:
+    enabled: true
+    # You can override events at the channel level
+    # events:
+    #   on_success: false
+    #   on_failure: true
+    host: smtp.example.com
+    port: 587
+    username: myuser
+    password: mypassword
+    from: godump@example.com
+    to: you@example.com
+  webhooks:
+    - enabled: true
+      url: https://hook.example.com/success
+      events:
+        on_success: true
+        on_failure: false
+    - enabled: true
+      url: https://hook.example.com/failure
+      events:
+        on_success: false
+        on_failure: true
+      headers:
+        Authorization: "Bearer your_token_here"
+
 logging:
   file: ""
 
@@ -62,6 +99,11 @@ instances:
 ```
 
 - `server.port`: The HTTP port for the web UI.
+- `auth`: Optional authentication for the Web UI. `enabled` to turn it on, along with `username` and `password`.
+- `notifications`: Optional post-run notifications. 
+  - `events`: Control what triggers notifications globally (`on_success`, `on_failure`).
+  - `email`: SMTP details for sending HTML-formatted email alerts. Can have its own `events` block.
+  - `webhooks`: An array of webhook endpoints. Each can have its own `events` block to fire only on specific outcomes.
 - `logging.file`: The path where log files should be written. 
 - `instances`: An array of MariaDB instances. Each requires its own name, connection details, backup directory, retention configuration (in days), and cron `schedule`.
 

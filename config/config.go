@@ -12,11 +12,42 @@ type AuthConfig struct {
 	Password string `yaml:"password"`
 }
 
+type EmailConfig struct {
+	Enabled  bool                      `yaml:"enabled"`
+	Events   *NotificationEventsConfig `yaml:"events,omitempty"`
+	Host     string                    `yaml:"host"`
+	Port     int                       `yaml:"port"`
+	Username string                    `yaml:"username"`
+	Password string                    `yaml:"password"`
+	From     string                    `yaml:"from"`
+	To       string                    `yaml:"to"`
+}
+
+type WebhookConfig struct {
+	Enabled  bool                      `yaml:"enabled"`
+	Events   *NotificationEventsConfig `yaml:"events,omitempty"`
+	URL      string                    `yaml:"url"`
+	Headers  map[string]string         `yaml:"headers"`
+}
+
+type NotificationEventsConfig struct {
+	OnSuccess bool `yaml:"on_success"`
+	OnFailure bool `yaml:"on_failure"`
+}
+
+type NotificationsConfig struct {
+	Events   NotificationEventsConfig `yaml:"events"`
+	Email    EmailConfig              `yaml:"email"`
+	Webhook  WebhookConfig            `yaml:"webhook"`
+	Webhooks []WebhookConfig          `yaml:"webhooks"`
+}
+
 type Config struct {
-	Server    ServerConfig     `yaml:"server"`
-	Auth      AuthConfig       `yaml:"auth"`
-	Logging   LoggingConfig    `yaml:"logging"`
-	Instances []InstanceConfig `yaml:"instances"`
+	Server        ServerConfig        `yaml:"server"`
+	Auth          AuthConfig          `yaml:"auth"`
+	Notifications NotificationsConfig `yaml:"notifications"`
+	Logging       LoggingConfig       `yaml:"logging"`
+	Instances     []InstanceConfig    `yaml:"instances"`
 }
 
 type ServerConfig struct {
@@ -61,6 +92,21 @@ func GenerateDefaultConfig(path string) error {
 			Enabled:  false,
 			Username: "admin",
 			Password: "password",
+		},
+		Notifications: NotificationsConfig{
+			Events: NotificationEventsConfig{
+				OnSuccess: false,
+				OnFailure: true,
+			},
+			Email: EmailConfig{
+				Enabled: false,
+				Host:    "smtp.example.com",
+				Port:    587,
+			},
+			Webhook: WebhookConfig{
+				Enabled: false,
+				URL:     "https://hook.example.com",
+			},
 		},
 		Logging: LoggingConfig{
 			File: "",
