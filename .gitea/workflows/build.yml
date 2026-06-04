@@ -35,6 +35,7 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: auto
+          R2_ENDPOINT_URL: ${{ secrets.R2_ENDPOINT_URL }}
         run: |
           aws s3 cp "${{ matrix.artifact }}" "s3://apps/${{ matrix.artifact }}" \
-            --endpoint-url https://7d5f26fc811bce9e5fce50d5cd9914c6.r2.cloudflarestorage.com
+            --endpoint-url $R2_ENDPOINT_URL
