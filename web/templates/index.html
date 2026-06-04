@@ -357,36 +357,39 @@
         </div>
 
         {{if .Databases}}
-        <div class="table-responsive">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Database</th>
-                        <th>First Discovered</th>
-                        <th>Last Backup Time</th>
-                        <th>Size</th>
-                        <th>Result</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {{range .Databases}}
-                    <tr>
-                        <td>{{.Name}}</td>
-                        <td>{{formatTime .FirstDiscovered}}</td>
-                        <td>{{formatTime .LastBackupTime}}</td>
-                        <td>{{if gt .LastBackupSize 0}}{{formatBytes .LastBackupSize}}{{else}}-{{end}}</td>
-                        <td>
-                            {{if .LastBackupResult}}
-                            <span class="badge {{.LastBackupResult}}">{{.LastBackupResult}}</span>
-                            {{else}}
-                            <span class="badge">Pending</span>
-                            {{end}}
-                        </td>
-                    </tr>
-                    {{end}}
-                </tbody>
-            </table>
-        </div>
+        <details>
+            <summary style="cursor: pointer; outline: none; color: var(--text-secondary); font-weight: 500;">Show Databases ({{len .Databases}})</summary>
+            <div class="table-responsive" style="margin-top: 1rem;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Database</th>
+                            <th>First Discovered</th>
+                            <th>Last Backup Time</th>
+                            <th>Size</th>
+                            <th>Result</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{range .Databases}}
+                        <tr>
+                            <td>{{.Name}}</td>
+                            <td>{{formatTime .FirstDiscovered}}</td>
+                            <td>{{formatTime .LastBackupTime}}</td>
+                            <td>{{if gt .LastBackupSize 0}}{{formatBytes .LastBackupSize}}{{else}}-{{end}}</td>
+                            <td>
+                                {{if .LastBackupResult}}
+                                <span class="badge {{.LastBackupResult}}">{{.LastBackupResult}}</span>
+                                {{else}}
+                                <span class="badge">Pending</span>
+                                {{end}}
+                            </td>
+                        </tr>
+                        {{end}}
+                    </tbody>
+                </table>
+            </div>
+        </details>
         {{else}}
         <p style="color: var(--text-secondary); font-size: 0.875rem;">No databases discovered yet.</p>
         {{end}}
@@ -395,16 +398,18 @@
 
     <div class="inventory-section">
         <h2>Backup Inventory</h2>
-        {{range $instName, $dbs := .Inventory}}
+        {{range .Inventory}}
         <details class="instance-card" style="padding: 1rem 1.5rem; cursor: pointer;">
             <summary style="font-size: 1.5rem; font-weight: 500; outline: none; list-style-position: inside;">
-                {{$instName}}
+                {{.Name}}
             </summary>
             <div style="cursor: default; margin-top: 1.5rem;">
-                {{range $dbName, $files := $dbs}}
+                {{$instName := .Name}}
+                {{range .Databases}}
+                {{$dbName := .Name}}
                 <details class="db-inventory" style="cursor: pointer;">
                     <summary style="font-size: 1.1rem; color: var(--text-secondary); margin: 0.5rem 0; outline: none; list-style-position: inside;">
-                        {{$dbName}} <span style="font-size: 0.8rem; opacity: 0.7;">({{len $files}} files)</span>
+                        {{.Name}} <span style="font-size: 0.8rem; opacity: 0.7;">({{len .Files}} files)</span>
                     </summary>
                     <div style="cursor: default; margin-top: 0.5rem;" class="table-responsive">
                         <table style="table-layout: fixed; width: 100%; min-width: 600px;">
@@ -415,7 +420,7 @@
                                 <col style="width: 23%;">
                             </colgroup>
                             <tbody>
-                                {{range $files}}
+                                {{range .Files}}
                                 <tr>
                                     <td style="word-break: break-all;">{{.Name}}</td>
                                     <td>{{formatTime .Timestamp}}</td>

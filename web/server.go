@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -32,7 +33,15 @@ type FileInfo struct {
 	Timestamp time.Time
 }
 
-type Inventory map[string]map[string][]FileInfo // Instance -> DB -> Files
+type DBInventory struct {
+	Name  string
+	Files []FileInfo
+}
+
+type InstanceInventory struct {
+	Name      string
+	Databases []DBInventory
+}
 
 func NewServer(cfg *config.Config, manager *backup.Manager) *Server {
 	s := &Server{
@@ -261,7 +270,7 @@ type TemplateData struct {
 	AnyRunning        bool
 	AuthEnabled       bool
 	Instances         []backup.InstanceSnapshot
-	Inventory         Inventory
+	Inventory         []InstanceInventory
 }
 
 func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
@@ -347,14 +356,14 @@ func (s *Server) handleRunInstance(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func (s *Server) getInventory() (Inventory, int64) {
-	inv := make(Inventory)
+func (s *Server) getInventory() ([]InstanceInventory, int64) {
+	var inv []InstanceInventory
 	instances := s.manager.GetInstances()
 	var totalSize int64
 
 	for _, inst := range instances {
 		instName := inst.Config.Name
-		inv[instName] = make(map[string][]FileInfo)
+		var dbInvs []DBInventory
 
 		entries, err := os.ReadDir(inst.Config.BackupDir)
 		if err != nil {
@@ -390,8 +399,18 @@ func (s *Server) getInventory() (Inventory, int64) {
 				totalSize += info.Size()
 			}
 			if len(fileInfos) > 0 {
-				inv[instName][dbName] = fileInfos
+				sort.Slice(fileInfos, func(i, j int) bool {
+					return fileInfos[i].Timestamp.After(fileInfos[j].Timestamp)
+				})
+				dbInvs = append(dbInvs, DBInventory{Name: dbName, Files: fileInfos})
 			}
+		}
+		
+		if len(dbInvs) > 0 {
+			sort.Slice(dbInvs, func(i, j int) bool {
+				return dbInvs[i].Name < dbInvs[j].Name
+			})
+			inv = append(inv, InstanceInventory{Name: instName, Databases: dbInvs})
 		}
 	}
 	return inv, totalSize

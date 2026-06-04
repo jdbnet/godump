@@ -3,6 +3,7 @@ package backup
 import (
 	"os"
 	"path/filepath"
+	"sort"
 	"sync"
 	"time"
 
@@ -73,6 +74,10 @@ func (s *InstanceStatus) Snapshot() InstanceSnapshot {
 			LastBackupResult: db.LastBackupResult,
 		})
 	}
+	
+	sort.Slice(snap.Databases, func(i, j int) bool {
+		return snap.Databases[i].Name < snap.Databases[j].Name
+	})
 
 	return snap
 }
@@ -128,8 +133,10 @@ func (m *Manager) GetInstances() []*InstanceStatus {
 	defer m.mu.RUnlock()
 
 	var result []*InstanceStatus
-	for _, status := range m.instances {
-		result = append(result, status)
+	for _, instCfg := range m.cfg.Instances {
+		if status, exists := m.instances[instCfg.Name]; exists {
+			result = append(result, status)
+		}
 	}
 	return result
 }
@@ -251,6 +258,8 @@ func (m *Manager) RunInstance(name string) {
 		inst.mu.Unlock()
 		return
 	}
+	
+	sort.Strings(dbs)
 
 	inst.mu.Lock()
 	for _, db := range dbs {
