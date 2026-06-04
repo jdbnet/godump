@@ -364,7 +364,6 @@
                     <thead>
                         <tr>
                             <th>Database</th>
-                            <th>First Discovered</th>
                             <th>Last Backup Time</th>
                             <th>Size</th>
                             <th>Result</th>
@@ -374,7 +373,6 @@
                         {{range .Databases}}
                         <tr>
                             <td>{{.Name}}</td>
-                            <td>{{formatTime .FirstDiscovered}}</td>
                             <td>{{formatTime .LastBackupTime}}</td>
                             <td>{{if gt .LastBackupSize 0}}{{formatBytes .LastBackupSize}}{{else}}-{{end}}</td>
                             <td>

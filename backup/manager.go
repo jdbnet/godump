@@ -16,7 +16,6 @@ import (
 
 type DBStatus struct {
 	Name            string    `json:"name"`
-	FirstDiscovered time.Time `json:"first_discovered"`
 	LastBackupTime  time.Time `json:"last_backup_time"`
 	LastBackupSize  int64     `json:"last_backup_size"`
 	LastBackupResult string   `json:"last_backup_result"` // success, skipped, failed
@@ -35,7 +34,6 @@ type InstanceStatus struct {
 
 type DBStatusSnapshot struct {
 	Name            string    `json:"name"`
-	FirstDiscovered time.Time `json:"first_discovered"`
 	LastBackupTime  time.Time `json:"last_backup_time"`
 	LastBackupSize  int64     `json:"last_backup_size"`
 	LastBackupResult string   `json:"last_backup_result"`
@@ -68,7 +66,6 @@ func (s *InstanceStatus) Snapshot() InstanceSnapshot {
 	for _, db := range s.Databases {
 		snap.Databases = append(snap.Databases, DBStatusSnapshot{
 			Name:             db.Name,
-			FirstDiscovered:  db.FirstDiscovered,
 			LastBackupTime:   db.LastBackupTime,
 			LastBackupSize:   db.LastBackupSize,
 			LastBackupResult: db.LastBackupResult,
@@ -188,7 +185,6 @@ func (m *Manager) DiscoverInitial() {
 
 				inst.Databases[db] = &DBStatus{
 					Name:             db,
-					FirstDiscovered:  time.Now(),
 					LastBackupTime:   lastTime,
 					LastBackupSize:   lastSize,
 					LastBackupResult: lastResult,
@@ -266,7 +262,6 @@ func (m *Manager) RunInstance(name string) {
 		if _, exists := inst.Databases[db]; !exists {
 			inst.Databases[db] = &DBStatus{
 				Name:            db,
-				FirstDiscovered: time.Now(),
 			}
 			logger.Info(name, "Discovered new database: %s", db)
 		}
