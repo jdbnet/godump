@@ -9,13 +9,10 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
-func discoverDatabases(cfg config.InstanceConfig) ([]string, error) {
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/?parseTime=true", cfg.User, cfg.Password, cfg.Host, cfg.Port)
-	db, err := sql.Open("mysql", dsn)
-	if err != nil {
-		return nil, err
+func discoverDatabases(db *sql.DB, cfg config.InstanceConfig) ([]string, error) {
+	if db == nil {
+		return nil, fmt.Errorf("database pool is not initialized")
 	}
-	defer db.Close()
 
 	// Ensure the connection is actually valid
 	if err := db.Ping(); err != nil {

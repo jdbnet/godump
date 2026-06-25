@@ -67,13 +67,15 @@ func backupDatabase(cfg config.InstanceConfig, dbName string) (int64, error) {
 		return 0, fmt.Errorf("failed to start gzip: %w", err)
 	}
 
-	if err := cmdDump.Wait(); err != nil {
-		cmdGzip.Process.Kill()
-		return 0, fmt.Errorf("mysqldump failed: %w", err)
+	errGzip := cmdGzip.Wait()
+	errDump := cmdDump.Wait()
+
+	if errDump != nil {
+		return 0, fmt.Errorf("mysqldump failed: %w", errDump)
 	}
 
-	if err := cmdGzip.Wait(); err != nil {
-		return 0, fmt.Errorf("gzip failed: %w", err)
+	if errGzip != nil {
+		return 0, fmt.Errorf("gzip failed: %w", errGzip)
 	}
 
 	// Get file size

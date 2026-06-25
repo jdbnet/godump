@@ -1,11 +1,15 @@
 package backup
 
 import (
+	"database/sql"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
 	"sync"
 	"time"
+
+	_ "github.com/go-sql-driver/mysql"
 
 	"godump/config"
 	"godump/logger"
@@ -23,6 +27,7 @@ type DBStatus struct {
 
 type InstanceStatus struct {
 	Config          config.InstanceConfig
+	DB              *sql.DB
 	LastRunTime     time.Time
 	NextRunTime     time.Time
 	OverallResult   string // success, partial, failed, running
@@ -97,8 +102,15 @@ func NewManager(cfg *config.Config) *Manager {
 	}
 
 	for _, instCfg := range cfg.Instances {
+		dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/?parseTime=true", instCfg.User, instCfg.Password, instCfg.Host, instCfg.Port)
+		db, err := sql.Open("mysql", dsn)
+		if err != nil {
+			logger.Error(instCfg.Name, "Failed to initialize database pool: %v", err)
+		}
+
 		status := &InstanceStatus{
 			Config:    instCfg,
+			DB:        db,
 			Databases: make(map[string]*DBStatus),
 		}
 		m.instances[instCfg.Name] = status
@@ -148,7 +160,7 @@ func (m *Manager) DiscoverInitial() {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	for name, inst := range m.instances {
-		dbs, err := discoverDatabases(inst.Config)
+		dbs, err := discoverDatabases(inst.DB, inst.Config)
 		if err != nil {
 			logger.Error(name, "Initial database discovery failed: %v", err)
 			inst.mu.Lock()
@@ -246,7 +258,7 @@ func (m *Manager) RunInstance(name string) {
 	logger.Info(name, "Starting backup job")
 
 	// 1. Discovery
-	dbs, err := discoverDatabases(inst.Config)
+	dbs, err := discoverDatabases(inst.DB, inst.Config)
 	if err != nil {
 		logger.Error(name, "Database discovery failed: %v", err)
 		inst.mu.Lock()
