@@ -70,6 +70,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/api/run/", s.requireAuthAPI(s.handleRunInstance))
 	s.mux.HandleFunc("/api/download", s.requireAuthAPI(s.handleDownload))
 	s.mux.HandleFunc("/api/delete", s.requireAuthAPI(s.handleDelete))
+
+	s.mux.HandleFunc("/download/", s.requireBasicAuth(s.handleLatestDownload))
 }
 
 var sessionToken string
@@ -106,6 +108,24 @@ func (s *Server) requireAuthAPI(next http.HandlerFunc) http.HandlerFunc {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
+		next(w, r)
+	}
+}
+
+func (s *Server) requireBasicAuth(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !s.cfg.Auth.Enabled {
+			next(w, r)
+			return
+		}
+		
+		user, pass, ok := r.BasicAuth()
+		if !ok || user != s.cfg.Auth.Username || pass != s.cfg.Auth.Password {
+			w.Header().Set("WWW-Authenticate", `Basic realm="Restricted"`)
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+		
 		next(w, r)
 	}
 }
@@ -188,6 +208,70 @@ func (s *Server) resolveFilePath(instName, dbName, fileName string) (string, err
 	}
 
 	return targetPath, nil
+}
+
+func (s *Server) handleLatestDownload(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Path should be /download/<instance>/<db> or /download/<instance>/<db>/
+	path := strings.TrimPrefix(r.URL.Path, "/download/")
+	path = strings.TrimSuffix(path, "/")
+	parts := strings.Split(path, "/")
+	
+	if len(parts) != 2 {
+		http.Error(w, "Invalid path format. Expected /download/<servername>/<databasename>/", http.StatusBadRequest)
+		return
+	}
+	
+	instName := parts[0]
+	dbName := parts[1]
+
+	inst := s.manager.GetInstance(instName)
+	if inst == nil {
+		http.Error(w, "Instance not found", http.StatusNotFound)
+		return
+	}
+
+	baseDir := filepath.Clean(inst.Config.BackupDir)
+	dbPath := filepath.Join(baseDir, dbName)
+
+	files, err := os.ReadDir(dbPath)
+	if err != nil {
+		http.Error(w, "Database backups not found", http.StatusNotFound)
+		return
+	}
+
+	var latestFile os.FileInfo
+	for _, entry := range files {
+		if entry.IsDir() {
+			continue
+		}
+		info, err := entry.Info()
+		if err != nil {
+			continue
+		}
+		if latestFile == nil || info.ModTime().After(latestFile.ModTime()) {
+			latestFile = info
+		}
+	}
+
+	if latestFile == nil {
+		http.Error(w, "No backups found for this database", http.StatusNotFound)
+		return
+	}
+
+	filePath, err := s.resolveFilePath(instName, dbName, latestFile.Name())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", latestFile.Name()))
+	w.Header().Set("Content-Type", "application/x-gzip")
+	http.ServeFile(w, r, filePath)
 }
 
 func (s *Server) handleDownload(w http.ResponseWriter, r *http.Request) {
