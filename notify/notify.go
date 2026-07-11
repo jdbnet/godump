@@ -14,16 +14,18 @@ import (
 )
 
 type DBResult struct {
-	Name   string `json:"name"`
-	Size   int64  `json:"size"`
-	Result string `json:"result"`
+	Name     string        `json:"name"`
+	Size     int64         `json:"size"`
+	Result   string        `json:"result"`
+	Duration time.Duration `json:"duration"`
 }
 
 type Payload struct {
-	InstanceName  string     `json:"instance_name"`
-	OverallResult string     `json:"overall_result"`
-	Time          time.Time  `json:"time"`
-	Databases     []DBResult `json:"databases"`
+	InstanceName  string        `json:"instance_name"`
+	OverallResult string        `json:"overall_result"`
+	Time          time.Time     `json:"time"`
+	TotalDuration time.Duration `json:"total_duration"`
+	Databases     []DBResult    `json:"databases"`
 }
 
 func shouldSend(global config.NotificationEventsConfig, local *config.NotificationEventsConfig, result string) bool {
@@ -58,8 +60,9 @@ func sendWebhook(cfg config.WebhookConfig, payload Payload) {
 	message := fmt.Sprintf("**GoDump Backup Result**\nInstance: %s\nResult: %s\nTime: %s\n\nDatabases:\n", 
 		payload.InstanceName, payload.OverallResult, payload.Time.Format("2006-01-02 15:04:05"))
 	for _, db := range payload.Databases {
-		message += fmt.Sprintf("- %s: %s (%s)\n", db.Name, db.Result, formatBytes(db.Size))
+		message += fmt.Sprintf("- %s: %s (%s, %s)\n", db.Name, db.Result, formatBytes(db.Size), formatDuration(db.Duration))
 	}
+	message += fmt.Sprintf("\n**Total Duration:** %s", formatDuration(payload.TotalDuration))
 
 	webhookPayload := map[string]interface{}{
 		"content": message,
@@ -113,6 +116,13 @@ func formatBytes(b int64) string {
 	return fmt.Sprintf("%.1f %ciB", float64(b)/float64(div), "KMGTPE"[exp])
 }
 
+func formatDuration(d time.Duration) string {
+	if d < time.Second {
+		return d.Round(time.Millisecond).String()
+	}
+	return d.Round(time.Second).String()
+}
+
 const emailTmplStr = `
 <!DOCTYPE html>
 <html>
@@ -139,6 +149,7 @@ const emailTmplStr = `
                 <tr>
                     <th>Database</th>
                     <th>Size</th>
+                    <th>Duration</th>
                     <th>Result</th>
                 </tr>
             </thead>
@@ -147,18 +158,21 @@ const emailTmplStr = `
                 <tr>
                     <td>{{.Name}}</td>
                     <td>{{formatBytes .Size}}</td>
+                    <td>{{formatDuration .Duration}}</td>
                     <td class="{{if eq .Result "success"}}accent{{else}}error{{end}}">{{.Result}}</td>
                 </tr>
                 {{end}}
             </tbody>
         </table>
+        
+        <p style="margin-top: 20px;">Total Duration: <strong>{{formatDuration .TotalDuration}}</strong></p>
     </div>
 </body>
 </html>
 `
 
 func sendEmail(cfg config.EmailConfig, payload Payload) {
-	tmpl, err := template.New("email").Funcs(template.FuncMap{"formatBytes": formatBytes}).Parse(emailTmplStr)
+	tmpl, err := template.New("email").Funcs(template.FuncMap{"formatBytes": formatBytes, "formatDuration": formatDuration}).Parse(emailTmplStr)
 	if err != nil {
 		logger.Error(payload.InstanceName, "Failed to parse email template: %v", err)
 		return

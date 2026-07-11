@@ -19,10 +19,11 @@ import (
 )
 
 type DBStatus struct {
-	Name            string    `json:"name"`
-	LastBackupTime  time.Time `json:"last_backup_time"`
-	LastBackupSize  int64     `json:"last_backup_size"`
-	LastBackupResult string   `json:"last_backup_result"` // success, skipped, failed
+	Name               string        `json:"name"`
+	LastBackupTime     time.Time     `json:"last_backup_time"`
+	LastBackupSize     int64         `json:"last_backup_size"`
+	LastBackupResult   string        `json:"last_backup_result"` // success, skipped, failed
+	LastBackupDuration time.Duration `json:"last_backup_duration"`
 }
 
 type InstanceStatus struct {
@@ -38,10 +39,11 @@ type InstanceStatus struct {
 }
 
 type DBStatusSnapshot struct {
-	Name            string    `json:"name"`
-	LastBackupTime  time.Time `json:"last_backup_time"`
-	LastBackupSize  int64     `json:"last_backup_size"`
-	LastBackupResult string   `json:"last_backup_result"`
+	Name               string        `json:"name"`
+	LastBackupTime     time.Time     `json:"last_backup_time"`
+	LastBackupSize     int64         `json:"last_backup_size"`
+	LastBackupResult   string        `json:"last_backup_result"`
+	LastBackupDuration time.Duration `json:"last_backup_duration"`
 }
 
 type InstanceSnapshot struct {
@@ -70,10 +72,11 @@ func (s *InstanceStatus) Snapshot() InstanceSnapshot {
 
 	for _, db := range s.Databases {
 		snap.Databases = append(snap.Databases, DBStatusSnapshot{
-			Name:             db.Name,
-			LastBackupTime:   db.LastBackupTime,
-			LastBackupSize:   db.LastBackupSize,
-			LastBackupResult: db.LastBackupResult,
+			Name:               db.Name,
+			LastBackupTime:     db.LastBackupTime,
+			LastBackupSize:     db.LastBackupSize,
+			LastBackupResult:   db.LastBackupResult,
+			LastBackupDuration: db.LastBackupDuration,
 		})
 	}
 	
@@ -294,6 +297,7 @@ func (m *Manager) RunInstance(name string) {
 		inst.mu.Lock()
 		dbStatus := inst.Databases[db]
 		dbStatus.LastBackupTime = time.Now()
+		dbStatus.LastBackupDuration = duration
 		if err != nil {
 			logger.Error(name, "Failed backup for database %s: %v", db, err)
 			dbStatus.LastBackupResult = "failed"
@@ -330,14 +334,18 @@ func (m *Manager) RunInstance(name string) {
 		OverallResult: inst.OverallResult,
 		Time:          time.Now(),
 	}
+	var totalDuration time.Duration
 	for _, db := range dbs {
 		dbStat := inst.Databases[db]
 		payload.Databases = append(payload.Databases, notify.DBResult{
-			Name:   dbStat.Name,
-			Size:   dbStat.LastBackupSize,
-			Result: dbStat.LastBackupResult,
+			Name:     dbStat.Name,
+			Size:     dbStat.LastBackupSize,
+			Result:   dbStat.LastBackupResult,
+			Duration: dbStat.LastBackupDuration,
 		})
+		totalDuration += dbStat.LastBackupDuration
 	}
+	payload.TotalDuration = totalDuration
 	inst.mu.Unlock()
 	
 	logger.Info(name, "Backup job completed. Result: %s", inst.OverallResult)
