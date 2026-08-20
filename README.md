@@ -1,4 +1,5 @@
 <div align="center">
+  <img src="web/public/favicon.png" alt="GoDump" width="128" />
 
   # GoDump
 

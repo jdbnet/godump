@@ -46,7 +46,7 @@ async function runAll() {
       :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'"
     >
       <div class="flex items-center gap-3 border-b border-default p-4">
-        <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent/20 text-sm font-bold text-accent">GD</div>
+        <img src="/favicon.png" alt="GoDump" class="h-9 w-9 shrink-0 rounded-lg object-cover" />
         <div class="min-w-0 flex-1">
           <div class="truncate text-sm font-semibold text-heading">GoDump</div>
           <div class="text-xs text-muted">MariaDB backups</div>

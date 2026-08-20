@@ -34,7 +34,7 @@ async function login() {
   <div class="flex min-h-screen items-center justify-center bg-surface px-4">
     <div class="card w-full max-w-md p-8 shadow-xl">
       <div class="mb-6 text-center">
-        <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-accent/20 text-lg font-bold text-accent">GD</div>
+        <img src="/favicon.png" alt="GoDump" class="mx-auto mb-4 h-14 w-14 rounded-xl object-cover" />
         <h1 class="text-2xl font-semibold text-heading">GoDump</h1>
         <p class="mt-1 text-sm text-muted">MariaDB backup manager</p>
       </div>
