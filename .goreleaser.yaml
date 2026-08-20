@@ -1,0 +1,61 @@
+version: 2
+
+project_name: godump
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: godump
+    main: .
+    binary: godump
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X main.Version={{.Version}}
+
+archives:
+  - id: binaries
+    ids:
+      - godump
+    format: binary
+    name_template: "godump-{{ .Arch }}"
+
+nfpms:
+  - id: godump
+    package_name: godump
+    ids:
+      - godump
+    vendor: JDB-NET
+    homepage: https://github.com/jdbnet/godump
+    maintainer: Jamie <jamie@jdbnet.co.uk>
+    description: |-
+      Lightweight MariaDB backup manager with scheduled jobs,
+      retention policies, and an embedded web UI.
+    formats:
+      - deb
+    bindir: /usr/local/bin
+    file_name_template: "godump_{{ .Version }}_{{ .Arch }}"
+    contents:
+      - src: deploy/godump.service
+        dst: /lib/systemd/system/godump.service
+      - src: config.yaml
+        dst: /etc/godump/config.yaml
+        type: config|noreplace
+    deb:
+      compression: gzip
+
+changelog:
+  disable: true
+
+release:
+  github:
+    owner: jdbnet
+    name: godump

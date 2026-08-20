@@ -11,9 +11,17 @@ import (
 	"godump/web"
 )
 
+var Version = "dev"
+
 func main() {
 	configPath := flag.String("config", "/etc/godump/config.yaml", "Path to configuration file")
+	showVersion := flag.Bool("version", false, "print version")
 	flag.Parse()
+
+	if *showVersion {
+		fmt.Println(Version)
+		return
+	}
 
 	cfg, err := config.LoadConfig(*configPath)
 	if err != nil {

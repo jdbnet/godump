@@ -26,12 +26,26 @@ The machine running GoDump must have the following installed in its system PATH:
 
 ## Installation
 
-1. Download the pre-compiled binary:
-   ```bash
-   wget https://apps.jdbnet.co.uk/godump
-   chmod +x godump
-   sudo mv godump /usr/local/bin/
-   ```
+Add the JDB-NET apt repository, then install the package:
+
+```bash
+curl -fsSL https://apt.jdbnet.co.uk/install/stable.sh | sudo bash
+sudo apt update
+sudo apt install godump
+```
+
+The package installs the binary to `/usr/local/bin/godump`, a default config at `/etc/godump/config.yaml`, and a systemd unit. Edit the config, then enable and start the service:
+
+```bash
+sudo systemctl enable godump
+sudo systemctl start godump
+```
+
+Updates are delivered through the apt repository:
+
+```bash
+sudo apt update && sudo apt upgrade godump
+```
 
 ## Configuration
 
@@ -121,46 +135,26 @@ instances:
 
 ## Usage
 
-1. Create a `config.yaml` using the template above (or let GoDump generate a default one by running it without a config).
-2. Run the application:
-   ```bash
-   godump --config /etc/godump/config.yaml
-   ```
-3. Open a web browser and navigate to `http://<your_server_ip>:<configured_port>`.
+After editing `/etc/godump/config.yaml`, restart the service:
 
-## Running as a Service (Systemd)
+```bash
+sudo systemctl restart godump
+```
 
-We highly recommend running GoDump via Systemd so that it starts automatically on boot and runs continuously in the background.
+Open a web browser and navigate to `http://<your_server_ip>:<configured_port>`.
 
-1. Create a configuration directory and move your `config.yaml` there:
-   ```bash
-   sudo mkdir -p /etc/godump
-   sudo cp config.yaml /etc/godump/config.yaml
-   ```
+To run manually (for example during development):
 
-2. Create a systemd service file at `/etc/systemd/system/godump.service`:
-   ```ini
-   [Unit]
-   Description=GoDump MariaDB Backup Manager
-   After=network.target
+```bash
+go build -o godump .
+./godump --config config.yaml
+```
 
-   [Service]
-   Type=simple
-   User=root
-   ExecStart=/usr/local/bin/godump --config /etc/godump/config.yaml
-   Restart=on-failure
-   RestartSec=5
+Check the installed version:
 
-   [Install]
-   WantedBy=multi-user.target
-   ```
-
-3. Enable and start the service:
-   ```bash
-   sudo systemctl daemon-reload
-   sudo systemctl enable godump
-   sudo systemctl start godump
-   ```
+```bash
+godump --version
+```
 
 From the UI, you can:
 - See the overall status of all configured instances.
