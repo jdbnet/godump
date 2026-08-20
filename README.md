@@ -1,6 +1,5 @@
 <div align="center">
-  <img src="web/templates/icon.png" alt="GoDump" width="128" />
-  
+
   # GoDump
 
 GoDump is a lightweight, standalone MariaDB backup application written in Go. It manages multiple MariaDB instances concurrently, automatically discovers databases, runs scheduled backups, enforces retention policies, and presents a sleek, embedded web UI to manage operations.
@@ -143,11 +142,23 @@ sudo systemctl restart godump
 
 Open a web browser and navigate to `http://<your_server_ip>:<configured_port>`.
 
-To run manually (for example during development):
+### Development
+
+Build the embedded web UI, then run the Go server:
 
 ```bash
-go build -o godump .
-./godump --config config.yaml
+cd web && npm install && npm run build && cd ..
+go run . --config config.yaml
+```
+
+For frontend development with hot reload, run the API and Vite dev server in separate terminals:
+
+```bash
+# Terminal 1 - API
+go run . --config config.yaml
+
+# Terminal 2 - Vite (proxies /api to the Go server)
+cd web && npm run dev
 ```
 
 Check the installed version:
@@ -157,8 +168,8 @@ godump --version
 ```
 
 From the UI, you can:
-- See the overall status of all configured instances.
-- Observe discovered databases.
-- Click **Run All Now** to manually trigger backups across all servers at once, or use the **Run Now** button on individual cards for targeted runs.
-- Monitor real-time progress via the auto-refreshing log console at the bottom of the page.
-- Review your backup inventory grouped by instance and database.
+- View an overview dashboard with instance and backup totals.
+- Manage MariaDB instances, schedules, and per-database status.
+- Browse backup files and download or delete them.
+- Monitor recent logs with auto-refresh.
+- Toggle light or dark theme from the sidebar.

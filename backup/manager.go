@@ -47,13 +47,13 @@ type DBStatusSnapshot struct {
 }
 
 type InstanceSnapshot struct {
-	Name          string
-	Host          string
-	LastRunTime   time.Time
-	NextRunTime   time.Time
-	OverallResult string
-	IsRunning     bool
-	Databases     []DBStatusSnapshot
+	Name          string             `json:"name"`
+	Host          string             `json:"host"`
+	LastRunTime   time.Time          `json:"last_run_time"`
+	NextRunTime   time.Time          `json:"next_run_time"`
+	OverallResult string             `json:"overall_result"`
+	IsRunning     bool               `json:"is_running"`
+	Databases     []DBStatusSnapshot `json:"databases"`
 }
 
 func (s *InstanceStatus) Snapshot() InstanceSnapshot {

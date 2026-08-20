@@ -1,0 +1,149 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-accent: #1ebe8a;
+  --color-accent-muted: #19986e;
+  --color-canvas: #f6f8fa;
+  --color-canvas-subtle: #ffffff;
+  --color-canvas-inset: #eff2f5;
+  --color-canvas-dark: #0f1117;
+  --color-canvas-subtle-dark: #161b22;
+  --color-canvas-inset-dark: #21262d;
+  --color-border-default: #d0d7de;
+  --color-border-muted-dark: #30363d;
+}
+
+@layer base {
+  :root { color-scheme: light; }
+  html.dark { color-scheme: dark; }
+  body {
+    background-color: var(--color-canvas);
+    color: #1f2328;
+    font-family: ui-sans-serif, system-ui, sans-serif;
+  }
+  html.dark body {
+    background-color: var(--color-canvas-dark);
+    color: #e6edf3;
+  }
+  button:not(:disabled), [role="button"] { @apply cursor-pointer; }
+  button:disabled { @apply cursor-not-allowed; }
+}
+
+@layer components {
+  .bg-surface { background-color: var(--color-canvas); }
+  html.dark .bg-surface { background-color: var(--color-canvas-dark); }
+  .bg-surface-raised { background-color: var(--color-canvas-subtle); }
+  html.dark .bg-surface-raised { background-color: var(--color-canvas-subtle-dark); }
+  .border-default { border-color: var(--color-border-default); }
+  html.dark .border-default { border-color: var(--color-border-muted-dark); }
+  .text-muted { @apply text-neutral-500 dark:text-neutral-400; }
+  .text-heading { @apply text-neutral-900 dark:text-neutral-100; }
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-neutral-950 transition hover:bg-accent-muted disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border px-3 py-1.5 text-sm font-medium transition disabled:opacity-50;
+    border-color: var(--color-border-default);
+    background-color: var(--color-canvas-subtle);
+    color: #1f2328;
+  }
+  .btn-secondary:hover:not(:disabled) {
+    background-color: var(--color-canvas-inset);
+  }
+  html.dark .btn-secondary {
+    border-color: var(--color-border-muted-dark);
+    background-color: var(--color-canvas-subtle-dark);
+    color: #e6edf3;
+  }
+  html.dark .btn-secondary:hover:not(:disabled) {
+    background-color: var(--color-canvas-inset-dark);
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center rounded-lg border px-3 py-1.5 text-sm transition;
+    border-color: var(--color-border-default);
+    color: #57606a;
+  }
+  .btn-ghost:hover {
+    background-color: var(--color-canvas-inset);
+  }
+  html.dark .btn-ghost { border-color: var(--color-border-muted-dark); color: #8b949e; }
+  html.dark .btn-ghost:hover {
+    background-color: var(--color-canvas-inset-dark);
+  }
+  .btn-row {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition disabled:opacity-50;
+  }
+  .btn-row-edit {
+    @apply bg-accent/15 text-accent-muted hover:bg-accent/30;
+  }
+  html.dark .btn-row-edit {
+    @apply text-accent hover:bg-accent/20;
+  }
+  .btn-danger {
+    @apply inline-flex items-center justify-center rounded-lg bg-red-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .card {
+    @apply rounded-xl border p-4;
+    border-color: var(--color-border-default);
+    background-color: var(--color-canvas-subtle);
+  }
+  html.dark .card {
+    border-color: var(--color-border-muted-dark);
+    background-color: var(--color-canvas-subtle-dark);
+  }
+  .input-field {
+    @apply w-full rounded-lg border px-3 py-2 text-sm outline-none ring-accent focus:border-accent focus:ring-1;
+    border-color: var(--color-border-default);
+    background-color: var(--color-canvas-subtle);
+    color: #1f2328;
+  }
+  html.dark .input-field {
+    border-color: var(--color-border-muted-dark);
+    background-color: var(--color-canvas-subtle-dark);
+    color: #e6edf3;
+  }
+  .nav-item-active { @apply bg-accent/15 font-medium text-accent; }
+  .nav-item-inactive { @apply text-neutral-600 hover:bg-neutral-100 dark:text-neutral-400; }
+  html.dark .nav-item-inactive:hover { background-color: var(--color-canvas-inset-dark); }
+  .badge { @apply inline-flex rounded-full px-2 py-0.5 text-xs font-medium; }
+  .badge-running { @apply bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300; }
+  .badge-stopped { @apply bg-neutral-200 text-neutral-600 dark:bg-slate-800 dark:text-slate-400; }
+  .badge-warn { @apply bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300; }
+  .badge-error { @apply bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300; }
+  .table-row-hover { border-top: 1px solid var(--color-border-default); }
+  html.dark .table-row-hover { border-top-color: var(--color-border-muted-dark); }
+  .table-scroll {
+    @apply -mx-4 overflow-x-auto px-4;
+    max-width: calc(100% + 2rem);
+    -webkit-overflow-scrolling: touch;
+  }
+  .data-table {
+    @apply w-max min-w-full border-collapse text-left text-sm;
+  }
+  .data-table :is(th, td) {
+    @apply whitespace-nowrap pr-4 align-top last:pr-0;
+  }
+  .data-table thead th {
+    @apply pb-2;
+  }
+  .data-table tbody td {
+    @apply py-2;
+  }
+  .log-console {
+    @apply rounded-xl border p-4 font-mono text-xs leading-relaxed;
+    border-color: var(--color-border-default);
+    background-color: #050505;
+    color: #888;
+    max-height: 70vh;
+    overflow-y: auto;
+  }
+  html.dark .log-console {
+    border-color: var(--color-border-muted-dark);
+  }
+  .log-info { @apply text-accent; }
+  .log-warn { @apply text-amber-500; }
+  .log-error { @apply text-red-400; }
+  .log-instance { @apply font-semibold text-violet-400; }
+}

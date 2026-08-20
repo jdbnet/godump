@@ -1,3 +1,5 @@
 godump
 config.yaml
 backups/
+web/node_modules/
+web/static/
