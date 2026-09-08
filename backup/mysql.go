@@ -2,6 +2,7 @@ package backup
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -23,9 +24,23 @@ func backupDatabase(cfg config.InstanceConfig, dbName string) (int64, error) {
 	filename := fmt.Sprintf("%s_%s_%s.sql.gz", cfg.Name, dbName, timestamp)
 	targetFile := filepath.Join(targetDir, filename)
 
-	f, err := os.Create(targetFile)
+	writePath := targetFile
+	if cfg.TempDir != "" {
+		if err := os.MkdirAll(cfg.TempDir, 0755); err != nil {
+			return 0, fmt.Errorf("failed to create temp directory %s: %w", cfg.TempDir, err)
+		}
+		writePath = filepath.Join(cfg.TempDir, filename)
+		defer func() {
+			if err := os.Remove(writePath); err != nil && !os.IsNotExist(err) {
+				logger.Warn(cfg.Name, "Failed to remove temp backup %s: %v", writePath, err)
+			}
+		}()
+		logger.Info(cfg.Name, "Staging backup for %s at %s", dbName, writePath)
+	}
+
+	f, err := os.Create(writePath)
 	if err != nil {
-		return 0, fmt.Errorf("failed to create backup file %s: %w", targetFile, err)
+		return 0, fmt.Errorf("failed to create backup file %s: %w", writePath, err)
 	}
 	defer f.Close()
 
@@ -78,12 +93,45 @@ func backupDatabase(cfg config.InstanceConfig, dbName string) (int64, error) {
 		return 0, fmt.Errorf("gzip failed: %w", errGzip)
 	}
 
-	// Get file size
-	stat, err := f.Stat()
+	if err := f.Close(); err != nil {
+		return 0, fmt.Errorf("failed to close backup file %s: %w", writePath, err)
+	}
+
+	if writePath != targetFile {
+		logger.Info(cfg.Name, "Copying backup for %s to %s", dbName, targetFile)
+		if err := copyFile(writePath, targetFile); err != nil {
+			if rmErr := os.Remove(targetFile); rmErr != nil && !os.IsNotExist(rmErr) {
+				logger.Warn(cfg.Name, "Failed to remove partial backup %s: %v", targetFile, rmErr)
+			}
+			return 0, fmt.Errorf("failed to copy backup to %s: %w", targetFile, err)
+		}
+	}
+
+	stat, err := os.Stat(targetFile)
 	if err != nil {
 		logger.Warn(cfg.Name, "Could not stat file %s to get size: %v", targetFile, err)
 		return 0, nil
 	}
 
 	return stat.Size(), nil
+}
+
+func copyFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+
+	if _, err := io.Copy(out, in); err != nil {
+		out.Close()
+		return err
+	}
+
+	return out.Close()
 }

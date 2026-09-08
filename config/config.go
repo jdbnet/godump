@@ -65,6 +65,7 @@ type InstanceConfig struct {
 	User          string   `yaml:"user"`
 	Password      string   `yaml:"password"`
 	BackupDir     string   `yaml:"backup_dir"`
+	TempDir       string   `yaml:"temp_dir,omitempty"`
 	RetentionDays int      `yaml:"retention_days"`
 	Schedule      string   `yaml:"schedule"`
 	Include       []string `yaml:"include,omitempty"`

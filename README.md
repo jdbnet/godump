@@ -102,6 +102,9 @@ instances:
     user: backup
     password: secret
     backup_dir: /backups/primary
+    # Optional: write dumps to local disk first, then copy the gzip to backup_dir.
+    # Useful when backup_dir is a remote/S3 mount that is slow or unreliable for streaming writes.
+    # temp_dir: /tmp/godump
     retention_days: 14
     schedule: "0 2 * * *"
     # Optional: explicitly include or exclude specific databases
@@ -128,6 +131,7 @@ instances:
   - `webhooks`: An array of webhook endpoints. Each can have its own `events` block to fire only on specific outcomes.
 - `logging.file`: The path where log files should be written. 
 - `instances`: An array of MariaDB instances. Each requires its own name, connection details, backup directory, retention configuration (in days), and cron `schedule`.
+  - `temp_dir`: (Optional) If set, dumps are written here first, then the finished `.sql.gz` is copied to `backup_dir` and the temp file is removed. Use this when `backup_dir` is a remote or S3 mount.
   - `include`: (Optional) If specified, ONLY the listed databases will be backed up.
   - `exclude`: (Optional) If specified, the listed databases will be ignored. System databases are ALWAYS excluded automatically.
 
