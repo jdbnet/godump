@@ -14,7 +14,7 @@ COPY --from=frontend /build/static ./web/static
 ARG VERSION=dev
 RUN CGO_ENABLED=0 go build -ldflags="-s -w -X main.Version=${VERSION}" -o godump .
 
-FROM alpine:3.22
+FROM alpine:3.24
 RUN apk add --no-cache ca-certificates tzdata mariadb-client gzip \
     && mkdir -p /etc/godump /backups \
     && command -v mysqldump >/dev/null || ln -s /usr/bin/mariadb-dump /usr/bin/mysqldump
