@@ -1,0 +1,13 @@
+.git
+.github
+.gitea
+.devcontainer
+dist
+godump
+backups
+web/node_modules
+web/static
+*.md
+LICENSE
+.gitignore
+.goreleaser.yaml

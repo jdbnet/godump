@@ -47,6 +47,24 @@ Updates are delivered through the apt repository:
 sudo apt update && sudo apt upgrade godump
 ```
 
+### Docker
+
+Images are published to `ghcr.io/jdbnet/godump` for `linux/amd64` and `linux/arm64`. Bind-mount your config and backup directory:
+
+```yaml
+services:
+  godump:
+    image: ghcr.io/jdbnet/godump:latest
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./config.yaml:/etc/godump/config.yaml:ro
+      - ./backups:/backups
+```
+
+Point `backup_dir` in `config.yaml` at a path under `/backups` (for example `/backups/primary`). If you use `temp_dir`, mount that too, or set it to a path under `/backups`.
+
 ## Configuration
 
 GoDump uses a YAML configuration file. By default, it looks for `/etc/godump/config.yaml`, but you can specify a custom path using the `--config` flag.
