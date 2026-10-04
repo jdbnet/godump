@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"godump/backup"
@@ -26,6 +27,7 @@ type Server struct {
 	cfg     *config.Config
 	manager *backup.Manager
 	mux     *http.ServeMux
+	invMu   sync.Mutex
 }
 
 type FileInfo struct {
@@ -45,11 +47,11 @@ type InstanceInventory struct {
 }
 
 type StatusResponse struct {
-	TotalInstances   int                      `json:"total_instances"`
-	TotalDatabases   int                      `json:"total_databases"`
-	UnreachableCount int                      `json:"unreachable_count"`
-	TotalBackupSize  int64                    `json:"total_backup_size"`
-	AnyRunning       bool                     `json:"any_running"`
+	TotalInstances   int                       `json:"total_instances"`
+	TotalDatabases   int                       `json:"total_databases"`
+	UnreachableCount int                       `json:"unreachable_count"`
+	TotalBackupSize  int64                     `json:"total_backup_size"`
+	AnyRunning       bool                      `json:"any_running"`
 	Instances        []backup.InstanceSnapshot `json:"instances"`
 }
 
@@ -476,6 +478,11 @@ func (s *Server) handleRunInstance(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) getInventory() ([]InstanceInventory, int64) {
+	// Status and inventory polls can overlap. One walk at a time keeps a slow
+	// backup directory from stacking scans in memory.
+	s.invMu.Lock()
+	defer s.invMu.Unlock()
+
 	var inv []InstanceInventory
 	instances := s.manager.GetInstances()
 	var totalSize int64

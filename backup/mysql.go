@@ -1,6 +1,7 @@
 package backup
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"os"
@@ -44,12 +45,12 @@ func backupDatabase(cfg config.InstanceConfig, dbName string) (int64, error) {
 	}
 	defer f.Close()
 
-	// Using sh -c allows us to pipe mysqldump output to gzip easily.
-	// Since we are taking dbName from INFORMATION_SCHEMA, we should still be careful with quotes,
-	// but mysqldump arguments can be passed via command directly, and we can pipe in go, or use sh.
-	// Piping in Go is safer.
+	dumpBin, err := dumpBinary()
+	if err != nil {
+		return 0, err
+	}
 
-	cmdDump := exec.Command("mysqldump",
+	cmdDump := exec.Command(dumpBin,
 		fmt.Sprintf("-h%s", cfg.Host),
 		fmt.Sprintf("-P%d", cfg.Port),
 		fmt.Sprintf("-u%s", cfg.User),
@@ -62,37 +63,55 @@ func backupDatabase(cfg config.InstanceConfig, dbName string) (int64, error) {
 
 	cmdGzip := exec.Command("gzip", "-c")
 
-	// Create pipe between mysqldump and gzip
 	dumpOut, err := cmdDump.StdoutPipe()
 	if err != nil {
 		return 0, fmt.Errorf("failed to create dump stdout pipe: %w", err)
 	}
-	cmdDump.Stderr = os.Stderr // or capture it
-
+	var dumpStderr, gzipStderr limitedBuffer
+	cmdDump.Stderr = &dumpStderr
 	cmdGzip.Stdin = dumpOut
 	cmdGzip.Stdout = f
-	cmdGzip.Stderr = os.Stderr
+	cmdGzip.Stderr = &gzipStderr
 
 	if err := cmdDump.Start(); err != nil {
-		return 0, fmt.Errorf("failed to start mysqldump: %w", err)
+		return 0, fmt.Errorf("failed to start %s: %w", dumpBin, err)
 	}
+	dumpWaited := false
+	defer func() {
+		if !dumpWaited && cmdDump.Process != nil {
+			_ = cmdDump.Process.Kill()
+			_ = cmdDump.Wait()
+		}
+	}()
 
 	if err := cmdGzip.Start(); err != nil {
-		cmdDump.Process.Kill()
 		return 0, fmt.Errorf("failed to start gzip: %w", err)
 	}
+	gzipWaited := false
+	defer func() {
+		if !gzipWaited && cmdGzip.Process != nil {
+			_ = cmdGzip.Process.Kill()
+			_ = cmdGzip.Wait()
+		}
+	}()
 
 	errGzip := cmdGzip.Wait()
+	gzipWaited = true
 	errDump := cmdDump.Wait()
+	dumpWaited = true
 
 	if errDump != nil {
-		return 0, fmt.Errorf("mysqldump failed: %w", errDump)
+		return 0, fmt.Errorf("%s failed: %w%s", dumpBin, errDump, stderrSuffix(dumpStderr.String()))
 	}
 
 	if errGzip != nil {
-		return 0, fmt.Errorf("gzip failed: %w", errGzip)
+		return 0, fmt.Errorf("gzip failed: %w%s", errGzip, stderrSuffix(gzipStderr.String()))
 	}
 
+	// Written backup pages stay in the kernel cache and Docker counts them as
+	// container memory long after the job has finished. Drop them once the
+	// file is durable.
+	dropFileCache(f)
 	if err := f.Close(); err != nil {
 		return 0, fmt.Errorf("failed to close backup file %s: %w", writePath, err)
 	}
@@ -132,6 +151,46 @@ func copyFile(src, dst string) error {
 		out.Close()
 		return err
 	}
+	if err := out.Sync(); err != nil {
+		out.Close()
+		return err
+	}
+	dropFileCache(in)
+	dropFileCache(out)
 
+	if err := in.Close(); err != nil {
+		out.Close()
+		return err
+	}
 	return out.Close()
+}
+
+const maxStderrBytes = 8192
+
+type limitedBuffer struct {
+	buf bytes.Buffer
+}
+
+func (l *limitedBuffer) Write(p []byte) (int, error) {
+	if l.buf.Len() < maxStderrBytes {
+		remain := maxStderrBytes - l.buf.Len()
+		chunk := p
+		if len(chunk) > remain {
+			chunk = chunk[:remain]
+		}
+		_, _ = l.buf.Write(chunk)
+	}
+	return len(p), nil
+}
+
+func (l *limitedBuffer) String() string {
+	return l.buf.String()
+}
+
+func stderrSuffix(msg string) string {
+	msg = string(bytes.TrimSpace([]byte(msg)))
+	if msg == "" {
+		return ""
+	}
+	return ": " + msg
 }

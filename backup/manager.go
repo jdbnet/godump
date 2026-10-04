@@ -27,15 +27,15 @@ type DBStatus struct {
 }
 
 type InstanceStatus struct {
-	Config          config.InstanceConfig
-	DB              *sql.DB
-	LastRunTime     time.Time
-	NextRunTime     time.Time
-	OverallResult   string // success, partial, failed, running
-	Databases       map[string]*DBStatus
-	IsRunning       bool
-	CronEntryID     cron.EntryID
-	mu              sync.RWMutex
+	Config        config.InstanceConfig
+	DB            *sql.DB
+	LastRunTime   time.Time
+	NextRunTime   time.Time
+	OverallResult string // success, partial, failed, running
+	Databases     map[string]*DBStatus
+	IsRunning     bool
+	CronEntryID   cron.EntryID
+	mu            sync.RWMutex
 }
 
 type DBStatusSnapshot struct {
@@ -79,7 +79,7 @@ func (s *InstanceStatus) Snapshot() InstanceSnapshot {
 			LastBackupDuration: db.LastBackupDuration,
 		})
 	}
-	
+
 	sort.Slice(snap.Databases, func(i, j int) bool {
 		return snap.Databases[i].Name < snap.Databases[j].Name
 	})
@@ -109,6 +109,13 @@ func NewManager(cfg *config.Config) *Manager {
 		db, err := sql.Open("mysql", dsn)
 		if err != nil {
 			logger.Error(instCfg.Name, "Failed to initialize database pool: %v", err)
+		} else {
+			// Keep the pool small. Idle connections retain driver buffers, and an
+			// unbounded pool can grow if the server drops connections.
+			db.SetMaxOpenConns(2)
+			db.SetMaxIdleConns(1)
+			db.SetConnMaxLifetime(5 * time.Minute)
+			db.SetConnMaxIdleTime(time.Minute)
 		}
 
 		status := &InstanceStatus{
@@ -126,7 +133,7 @@ func NewManager(cfg *config.Config) *Manager {
 					m.RunInstance(name)
 				}
 			}(instCfg.Name))
-			
+
 			if err != nil {
 				logger.Error(instCfg.Name, "Failed to schedule cron job: %v", err)
 			} else {
@@ -213,7 +220,7 @@ func (m *Manager) DiscoverInitial() {
 				logger.Info(name, "Discovered initial database: %s", db)
 			}
 		}
-		
+
 		if latestInstanceTime.After(inst.LastRunTime) {
 			inst.LastRunTime = latestInstanceTime
 		}
@@ -269,14 +276,14 @@ func (m *Manager) RunInstance(name string) {
 		inst.mu.Unlock()
 		return
 	}
-	
+
 	sort.Strings(dbs)
 
 	inst.mu.Lock()
 	for _, db := range dbs {
 		if _, exists := inst.Databases[db]; !exists {
 			inst.Databases[db] = &DBStatus{
-				Name:            db,
+				Name: db,
 			}
 			logger.Info(name, "Discovered new database: %s", db)
 		}
@@ -328,7 +335,7 @@ func (m *Manager) RunInstance(name string) {
 	} else {
 		inst.OverallResult = "partial"
 	}
-	
+
 	payload := notify.Payload{
 		InstanceName:  name,
 		OverallResult: inst.OverallResult,
@@ -347,7 +354,7 @@ func (m *Manager) RunInstance(name string) {
 	}
 	payload.TotalDuration = totalDuration
 	inst.mu.Unlock()
-	
+
 	logger.Info(name, "Backup job completed. Result: %s", inst.OverallResult)
 	notify.Send(m.cfg.Notifications, payload)
 }

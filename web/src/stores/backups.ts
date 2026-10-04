@@ -13,33 +13,45 @@ export const useBackupsStore = defineStore('backups', {
     statusLoading: false,
     inventoryLoading: false,
     logsLoading: false,
+    statusInflight: false,
+    inventoryInflight: false,
+    logsInflight: false,
     actionBusy: false,
   }),
   actions: {
     async refreshStatus(background = false) {
+      if (this.statusInflight) return
+      this.statusInflight = true
       if (!background) this.statusLoading = true
       try {
         const { data } = await api.get<StatusResponse>('/status')
         this.status = data
       } finally {
+        this.statusInflight = false
         if (!background) this.statusLoading = false
       }
     },
     async refreshInventory(background = false) {
+      if (this.inventoryInflight) return
+      this.inventoryInflight = true
       if (!background) this.inventoryLoading = true
       try {
         const { data } = await api.get<InstanceInventory[]>('/inventory')
         this.inventory = data
       } finally {
+        this.inventoryInflight = false
         if (!background) this.inventoryLoading = false
       }
     },
     async refreshLogs(background = false) {
+      if (this.logsInflight) return
+      this.logsInflight = true
       if (!background) this.logsLoading = true
       try {
         const { data } = await api.get<LogEntry[]>('/logs')
         this.logs = data
       } finally {
+        this.logsInflight = false
         if (!background) this.logsLoading = false
       }
     },

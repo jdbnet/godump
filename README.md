@@ -11,7 +11,7 @@ GoDump is a lightweight, standalone MariaDB backup application written in Go. It
 
 - **Multi-Instance Support**: Manage multiple MariaDB servers independently.
 - **Auto-Discovery**: Automatically discovers all non-system databases (`information_schema`, `performance_schema`, `mysql`, `sys` are ignored) before backing up.
-- **Isolated Backups**: Each database is backed up via `mysqldump` in a dedicated subprocess, compressed instantly with `gzip`, and stored independently. Failure of one database does not disrupt others.
+- **Isolated Backups**: Each database is backed up via `mariadb-dump` (or `mysqldump`) in a dedicated subprocess, compressed instantly with `gzip`, and stored independently. Failure of one database does not disrupt others.
 - **Retention Policies**: Configurable retention period (in days) per instance. Old backups are automatically groomed after every run.
 - **Embedded Web UI**: Single-page modern interface served directly from the Go binary. No external CDN dependencies, fully functional offline. View statuses, trigger manual backups, browse backup files, and read real-time logs.
 - **Optional Authentication**: Secure your dashboard and API with a simple, cookie-based session login.
@@ -21,7 +21,7 @@ GoDump is a lightweight, standalone MariaDB backup application written in Go. It
 ## Requirements
 
 The machine running GoDump must have the following installed in its system PATH:
-- `mysqldump`
+- `mariadb-dump` (or `mysqldump`)
 - `gzip`
 
 ## Installation
@@ -153,7 +153,7 @@ instances:
   - `include`: (Optional) If specified, ONLY the listed databases will be backed up.
   - `exclude`: (Optional) If specified, the listed databases will be ignored. System databases are ALWAYS excluded automatically.
 
-> **Note:** Make sure the user specified in the configuration has `SELECT`, `LOCK TABLES`, `SHOW VIEW`, and `TRIGGER` permissions to properly perform `mysqldump` operations across all databases.
+> **Note:** Make sure the user specified in the configuration has `SELECT`, `LOCK TABLES`, `SHOW VIEW`, and `TRIGGER` permissions to properly perform dumps across all databases.
 
 ## Usage
 
