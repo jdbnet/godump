@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"godump/apikey"
 	"godump/backup"
 	"godump/config"
 	"godump/logger"
@@ -49,12 +50,18 @@ func main() {
 
 	logger.Info("", "Starting GoDump...")
 
+	keys, err := apikey.Open(*configPath, cfg)
+	if err != nil {
+		logger.Error("", "Failed to load API keys: %v", err)
+		os.Exit(1)
+	}
+
 	manager := backup.NewManager(cfg)
-	
+
 	logger.Info("", "Running initial database discovery...")
 	manager.DiscoverInitial()
 
-	server := web.NewServer(cfg, manager)
+	server := web.NewServer(cfg, manager, Version, keys)
 	if err := server.Start(); err != nil {
 		logger.Error("", "Server stopped: %v", err)
 		os.Exit(1)

@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import {
-  Menu, X, LayoutDashboard, Database, Archive, ScrollText, LogOut, Sun, Moon, Play,
+  Menu, X, LayoutDashboard, Database, Archive, ScrollText, KeyRound, LogOut, Sun, Moon, Play,
 } from '@lucide/vue'
 import { useAuthStore } from '@/stores/auth'
 import { applyTheme, useThemeStore } from '@/stores/theme'
@@ -20,6 +20,7 @@ const nav = [
   { to: '/instances', label: 'Instances', icon: Database, match: (p: string) => p.startsWith('/instances') },
   { to: '/backups', label: 'Backups', icon: Archive, match: (p: string) => p.startsWith('/backups') },
   { to: '/logs', label: 'Logs', icon: ScrollText, match: (p: string) => p.startsWith('/logs') },
+  { to: '/settings', label: 'API keys', icon: KeyRound, match: (p: string) => p.startsWith('/settings') },
 ]
 
 const pageTitle = computed(() => nav.find((n) => n.match(route.path))?.label || 'GoDump')

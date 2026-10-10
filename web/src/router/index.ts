@@ -5,6 +5,7 @@ import DashboardView from '@/views/DashboardView.vue'
 import InstancesView from '@/views/InstancesView.vue'
 import BackupsView from '@/views/BackupsView.vue'
 import LogsView from '@/views/LogsView.vue'
+import SettingsView from '@/views/SettingsView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -14,6 +15,7 @@ const router = createRouter({
     { path: '/instances', component: InstancesView },
     { path: '/backups', component: BackupsView },
     { path: '/logs', component: LogsView },
+    { path: '/settings', component: SettingsView },
   ],
 })
 

@@ -6,6 +6,15 @@ auth:
   username: admin
   password: password
 
+# Read-only keys for GET /api/v1/health and GET /api/v1/backups/status.
+# Store the SHA-256 hex hash of the key, not the key itself.
+# api_keys:
+#   - name: dashboard
+#     hash: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+#     prefix: "gd_0123abcd"
+# Keys created in the web UI are written here when the config file is read-only.
+# api_keys_file: /backups/api-keys.yaml
+
 notifications:
   events:
     on_success: false

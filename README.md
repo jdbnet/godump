@@ -15,6 +15,7 @@ GoDump is a lightweight, standalone MariaDB backup application written in Go. It
 - **Retention Policies**: Configurable retention period (in days) per instance. Old backups are automatically groomed after every run.
 - **Embedded Web UI**: Single-page modern interface served directly from the Go binary. No external CDN dependencies, fully functional offline. View statuses, trigger manual backups, browse backup files, and read real-time logs.
 - **Optional Authentication**: Secure your dashboard and API with a simple, cookie-based session login.
+- **Read-only status API**: API keys for `GET /api/v1/health` and `GET /api/v1/backups/status`, so an external dashboard can show backup health without being able to start or change anything.
 - **Notifications**: Receive instant alerts when backup jobs complete via HTML Emails (SMTP) or JSON Webhooks (perfect for Ntfy, Gotify, Discord, Slack, Zapier, etc.).
 - **Cron Scheduling**: Uses standard cron expressions to schedule automated jobs.
 
@@ -113,6 +114,12 @@ notifications:
 logging:
   file: ""
 
+# api_keys:
+#   - name: dashboard
+#     hash: "<sha256 hex of the key>"
+#     prefix: "gd_0123abcd"
+# api_keys_file: /backups/api-keys.yaml
+
 instances:
   - name: primary
     host: 192.168.1.10
@@ -143,6 +150,8 @@ instances:
 
 - `server.port`: The HTTP port for the web UI.
 - `auth`: Optional authentication for the Web UI. `enabled` to turn it on, along with `username` and `password`.
+- `api_keys`: Optional read-only keys for the status API. Each entry has a `name` and a `hash` (hex SHA-256 of the full key). The key itself is not stored. `prefix` is optional and is only used to recognise the key in the UI.
+- `api_keys_file`: Optional path for keys created in the web UI. Defaults to `api-keys.yaml` next to this file. Use a writable path when the configuration file is mounted read-only.
 - `notifications`: Optional post-run notifications. 
   - `events`: Control what triggers notifications globally (`on_success`, `on_failure`).
   - `email`: SMTP details for sending HTML-formatted email alerts. Can have its own `events` block.
@@ -154,6 +163,77 @@ instances:
   - `exclude`: (Optional) If specified, the listed databases will be ignored. System databases are ALWAYS excluded automatically.
 
 > **Note:** Make sure the user specified in the configuration has `SELECT`, `LOCK TABLES`, `SHOW VIEW`, and `TRIGGER` permissions to properly perform dumps across all databases.
+
+## Status API
+
+The status API is read-only and always requires an API key, including when dashboard login is turned off. Existing UI routes keep using the session cookie (or no login, when `auth.enabled` is false). An API key cannot start backups, delete files, download backups, or manage keys.
+
+Send the key as `Authorization: Bearer <key>` or `X-API-Key: <key>`. A missing or invalid key returns `401` and `{"error":"unauthorised"}`.
+
+A job is one discovered database on a configured MariaDB instance. The stable `id` is `<instance>/<database>`. If an instance has not discovered any databases, it is reported as one job so a connection failure is still visible. `target` is `<host>:<port>/<database>` (or `<host>:<port>` for that instance-level job). `last_size_bytes` is the size of that database's latest backup file when GoDump knows it. Times the app does not know are JSON `null`.
+
+`stale` is true when the last successful backup is older than twice the gap between the next two scheduled runs, or older than 48 hours when the instance has no schedule. `overall` is `failing` if any enabled job's last run failed, `warning` if any enabled job is stale, partial, or has never run, `ok` when every enabled job is healthy, and `unknown` when there are no jobs.
+
+### `GET /api/v1/health`
+
+```json
+{"app":"godump","version":"1.2.3","status":"ok"}
+```
+
+### `GET /api/v1/backups/status`
+
+```json
+{
+  "app": "godump",
+  "version": "1.2.3",
+  "generated_at": "2026-06-02T12:00:00Z",
+  "overall": "ok",
+  "jobs": [
+    {
+      "id": "primary/app",
+      "name": "app",
+      "target": "192.168.1.10:3306/app",
+      "enabled": true,
+      "last_run_at": "2026-06-02T02:00:04Z",
+      "last_status": "success",
+      "last_success_at": "2026-06-02T02:00:04Z",
+      "last_duration_seconds": 12,
+      "last_size_bytes": 1048576,
+      "last_error": null,
+      "next_run_at": "2026-06-03T02:00:00Z",
+      "stale": false
+    }
+  ]
+}
+```
+
+`last_status` is `success`, `failed`, `running`, `partial`, or `never_run`.
+
+### Creating a key
+
+In the web UI, open **API keys**, enter a name, and choose **Create key**. Copy the key immediately. GoDump stores only its SHA-256 hash and will not show the key again. Revoking a key stops it working. Keys declared in the configuration file are listed there, and are removed by editing the configuration and restarting.
+
+To provision a key in the configuration instead:
+
+```bash
+key="gd_$(openssl rand -hex 32)"
+printf '%s\n' "$key"
+printf '%s' "$key" | sha256sum
+```
+
+Put the hash in `config.yaml`, then restart GoDump. Keep the printed key somewhere safe. It is not written to the configuration.
+
+```yaml
+api_keys:
+  - name: dashboard
+    hash: "<sha256 hex from the command above>"
+    prefix: "gd_0123abcd"
+```
+
+```bash
+curl -s -H "Authorization: Bearer gd_..." http://127.0.0.1:8080/api/v1/health
+curl -s -H "X-API-Key: gd_..." http://127.0.0.1:8080/api/v1/backups/status
+```
 
 ## Usage
 
