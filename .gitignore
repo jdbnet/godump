@@ -2,3 +2,4 @@ godump
 backups/
 web/node_modules/
 web/static/
+api-keys.yaml

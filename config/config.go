@@ -24,10 +24,10 @@ type EmailConfig struct {
 }
 
 type WebhookConfig struct {
-	Enabled  bool                      `yaml:"enabled"`
-	Events   *NotificationEventsConfig `yaml:"events,omitempty"`
-	URL      string                    `yaml:"url"`
-	Headers  map[string]string         `yaml:"headers"`
+	Enabled bool                      `yaml:"enabled"`
+	Events  *NotificationEventsConfig `yaml:"events,omitempty"`
+	URL     string                    `yaml:"url"`
+	Headers map[string]string         `yaml:"headers"`
 }
 
 type NotificationEventsConfig struct {
@@ -42,12 +42,22 @@ type NotificationsConfig struct {
 	Webhooks []WebhookConfig          `yaml:"webhooks"`
 }
 
+// APIKeyConfig is a pre-provisioned read-only status API key.
+// Hash is the hex-encoded SHA-256 of the full key. The key itself is never stored.
+type APIKeyConfig struct {
+	Name   string `yaml:"name"`
+	Hash   string `yaml:"hash"`
+	Prefix string `yaml:"prefix,omitempty"`
+}
+
 type Config struct {
 	Server        ServerConfig        `yaml:"server"`
 	Auth          AuthConfig          `yaml:"auth"`
 	Notifications NotificationsConfig `yaml:"notifications"`
 	Logging       LoggingConfig       `yaml:"logging"`
 	Instances     []InstanceConfig    `yaml:"instances"`
+	APIKeys       []APIKeyConfig      `yaml:"api_keys,omitempty"`
+	APIKeysFile   string              `yaml:"api_keys_file,omitempty"`
 }
 
 type ServerConfig struct {

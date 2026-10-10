@@ -5,6 +5,7 @@ import (
 	"embed"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/fs"
 	"net/http"
@@ -15,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"godump/apikey"
 	"godump/backup"
 	"godump/config"
 	"godump/logger"
@@ -26,6 +28,8 @@ var staticFS embed.FS
 type Server struct {
 	cfg     *config.Config
 	manager *backup.Manager
+	keys    *apikey.Store
+	version string
 	mux     *http.ServeMux
 	invMu   sync.Mutex
 }
@@ -65,10 +69,12 @@ type loginRequest struct {
 	Password string `json:"password"`
 }
 
-func NewServer(cfg *config.Config, manager *backup.Manager) *Server {
+func NewServer(cfg *config.Config, manager *backup.Manager, version string, keys *apikey.Store) *Server {
 	s := &Server{
 		cfg:     cfg,
 		manager: manager,
+		keys:    keys,
+		version: version,
 		mux:     http.NewServeMux(),
 	}
 	s.routes()
@@ -85,6 +91,13 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/auth/login", s.handleAuthLogin)
 	s.mux.HandleFunc("POST /api/auth/logout", s.requireAuthAPI(s.handleAuthLogout))
 	s.mux.HandleFunc("GET /api/auth/me", s.handleAuthMe)
+
+	s.mux.HandleFunc("GET /api/v1/health", s.requireAPIKey(s.handleV1Health))
+	s.mux.HandleFunc("GET /api/v1/backups/status", s.requireAPIKey(s.handleV1BackupStatus))
+
+	s.mux.HandleFunc("GET /api/keys", s.requireAuthAPI(s.handleListKeys))
+	s.mux.HandleFunc("POST /api/keys", s.requireAuthAPI(s.handleCreateKey))
+	s.mux.HandleFunc("DELETE /api/keys/{id}", s.requireAuthAPI(s.handleRevokeKey))
 
 	s.mux.HandleFunc("GET /api/status", s.requireAuthAPI(s.handleStatus))
 	s.mux.HandleFunc("GET /api/inventory", s.requireAuthAPI(s.handleInventory))
@@ -115,6 +128,26 @@ func (s *Server) isAuthenticated(r *http.Request) bool {
 	}
 	cookie, err := r.Cookie("godump_session")
 	return err == nil && cookie.Value == sessionToken
+}
+
+func apiKeyFromRequest(r *http.Request) string {
+	if header := r.Header.Get("Authorization"); header != "" {
+		const prefix = "bearer "
+		if len(header) >= len(prefix) && strings.EqualFold(header[:len(prefix)], prefix) {
+			return strings.TrimSpace(header[len(prefix):])
+		}
+	}
+	return strings.TrimSpace(r.Header.Get("X-API-Key"))
+}
+
+func (s *Server) requireAPIKey(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if s.keys == nil || !s.keys.Valid(apiKeyFromRequest(r)) {
+			s.writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorised"})
+			return
+		}
+		next(w, r)
+	}
 }
 
 func (s *Server) requireAuthAPI(next http.HandlerFunc) http.HandlerFunc {
@@ -152,6 +185,86 @@ func (s *Server) writeJSON(w http.ResponseWriter, status int, payload any) {
 		return
 	}
 	_ = json.NewEncoder(w).Encode(payload)
+}
+
+type healthResponse struct {
+	App     string `json:"app"`
+	Version string `json:"version"`
+	Status  string `json:"status"`
+}
+
+func (s *Server) handleV1Health(w http.ResponseWriter, r *http.Request) {
+	s.writeJSON(w, http.StatusOK, healthResponse{
+		App:     "godump",
+		Version: s.version,
+		Status:  "ok",
+	})
+}
+
+func (s *Server) handleV1BackupStatus(w http.ResponseWriter, r *http.Request) {
+	s.writeJSON(w, http.StatusOK, s.manager.BackupStatus("godump", s.version, time.Now()))
+}
+
+func (s *Server) handleListKeys(w http.ResponseWriter, r *http.Request) {
+	keys := []apikey.KeyInfo{}
+	if s.keys != nil {
+		keys = s.keys.List()
+	}
+	s.writeJSON(w, http.StatusOK, struct {
+		Keys []apikey.KeyInfo `json:"keys"`
+	}{Keys: keys})
+}
+
+func (s *Server) handleCreateKey(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Name string `json:"name"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
+		return
+	}
+	if s.keys == nil {
+		s.writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "API keys are not available"})
+		return
+	}
+	created, err := s.keys.Create(req.Name)
+	if err != nil {
+		if errors.Is(err, apikey.ErrNameRequired) || errors.Is(err, apikey.ErrNameTooLong) || errors.Is(err, apikey.ErrTooMany) {
+			s.writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+			return
+		}
+		logger.Error("", "Failed to create API key: %v", err)
+		s.writeJSON(w, http.StatusInternalServerError, map[string]string{
+			"error": "Could not save the API key. Check that the API key file is writable.",
+		})
+		return
+	}
+	logger.Info("", "Created API key %q", created.Name)
+	s.writeJSON(w, http.StatusCreated, created)
+}
+
+func (s *Server) handleRevokeKey(w http.ResponseWriter, r *http.Request) {
+	if s.keys == nil {
+		s.writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "API keys are not available"})
+		return
+	}
+	err := s.keys.Revoke(r.PathValue("id"))
+	if err != nil {
+		switch {
+		case errors.Is(err, apikey.ErrNotFound):
+			s.writeJSON(w, http.StatusNotFound, map[string]string{"error": err.Error()})
+		case errors.Is(err, apikey.ErrConfigManaged):
+			s.writeJSON(w, http.StatusConflict, map[string]string{"error": err.Error()})
+		default:
+			logger.Error("", "Failed to revoke API key: %v", err)
+			s.writeJSON(w, http.StatusInternalServerError, map[string]string{
+				"error": "Could not revoke the API key. Check that the API key file is writable.",
+			})
+		}
+		return
+	}
+	logger.Info("", "Revoked API key %s", r.PathValue("id"))
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *Server) handleAuthMe(w http.ResponseWriter, r *http.Request) {

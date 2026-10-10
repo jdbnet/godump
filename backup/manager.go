@@ -24,18 +24,22 @@ type DBStatus struct {
 	LastBackupSize     int64         `json:"last_backup_size"`
 	LastBackupResult   string        `json:"last_backup_result"` // success, skipped, failed
 	LastBackupDuration time.Duration `json:"last_backup_duration"`
+	LastError          string
+	InProgress         bool
+	RunStartedAt       time.Time
 }
 
 type InstanceStatus struct {
-	Config        config.InstanceConfig
-	DB            *sql.DB
-	LastRunTime   time.Time
-	NextRunTime   time.Time
-	OverallResult string // success, partial, failed, running
-	Databases     map[string]*DBStatus
-	IsRunning     bool
-	CronEntryID   cron.EntryID
-	mu            sync.RWMutex
+	Config         config.InstanceConfig
+	DB             *sql.DB
+	LastRunTime    time.Time
+	NextRunTime    time.Time
+	OverallResult  string // success, partial, failed, running
+	DiscoveryError string
+	Databases      map[string]*DBStatus
+	IsRunning      bool
+	CronEntryID    cron.EntryID
+	mu             sync.RWMutex
 }
 
 type DBStatusSnapshot struct {
@@ -147,6 +151,12 @@ func NewManager(cfg *config.Config) *Manager {
 	return m
 }
 
+func (m *Manager) Stop() {
+	if m.cron != nil {
+		m.cron.Stop()
+	}
+}
+
 func (m *Manager) GetInstances() []*InstanceStatus {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -175,11 +185,13 @@ func (m *Manager) DiscoverInitial() {
 			logger.Error(name, "Initial database discovery failed: %v", err)
 			inst.mu.Lock()
 			inst.OverallResult = "failed"
+			inst.DiscoveryError = err.Error()
 			inst.mu.Unlock()
 			continue
 		}
 
 		inst.mu.Lock()
+		inst.DiscoveryError = ""
 		var latestInstanceTime time.Time
 		var hasAnyBackup bool
 
@@ -273,9 +285,14 @@ func (m *Manager) RunInstance(name string) {
 		logger.Error(name, "Database discovery failed: %v", err)
 		inst.mu.Lock()
 		inst.OverallResult = "failed"
+		inst.DiscoveryError = err.Error()
 		inst.mu.Unlock()
 		return
 	}
+
+	inst.mu.Lock()
+	inst.DiscoveryError = ""
+	inst.mu.Unlock()
 
 	sort.Strings(dbs)
 
@@ -298,21 +315,30 @@ func (m *Manager) RunInstance(name string) {
 	for _, db := range dbs {
 		logger.Info(name, "Starting backup for database %s", db)
 		start := time.Now()
+		inst.mu.Lock()
+		dbStatus := inst.Databases[db]
+		dbStatus.InProgress = true
+		dbStatus.RunStartedAt = start
+		inst.mu.Unlock()
+
 		size, err := backupDatabase(inst.Config, db)
 		duration := time.Since(start)
 
 		inst.mu.Lock()
-		dbStatus := inst.Databases[db]
+		dbStatus = inst.Databases[db]
+		dbStatus.InProgress = false
 		dbStatus.LastBackupTime = time.Now()
 		dbStatus.LastBackupDuration = duration
 		if err != nil {
 			logger.Error(name, "Failed backup for database %s: %v", db, err)
 			dbStatus.LastBackupResult = "failed"
+			dbStatus.LastError = err.Error()
 			failedCount++
 		} else {
 			logger.Info(name, "Completed backup for database %s in %v, size %d bytes", db, duration, size)
 			dbStatus.LastBackupResult = "success"
 			dbStatus.LastBackupSize = size
+			dbStatus.LastError = ""
 			successCount++
 		}
 		inst.mu.Unlock()
